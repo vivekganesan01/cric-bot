@@ -34,6 +34,7 @@ from pymongo import MongoClient
 import re
 from datetime import datetime
 import time
+import configparser
 
 
 class GameTheory:
@@ -43,6 +44,8 @@ class GameTheory:
         logging.basicConfig(level=logging.INFO, filename='gametheory.log', filemode='w',
                             format='%(name)s - %(levelname)s - %(message)s')
         logging.info('**** Migration *****')
+        self.config = configparser.ConfigParser()
+        self.config.read('config.ini')
         # url'slogging.info
         self.base_url = "http://howstat.com/cricket/Statistics/Players/"
         self.overview = "PlayerOverviewSummary.asp?PlayerID="
@@ -60,7 +63,7 @@ class GameTheory:
         }
         # db dependencies
         self.db_client = None
-        self.db_name = 'gametheory'
+        self.db_name = self.config['db']['dbname']
         self.test_collection = 'test_match'
         self.ipl_collection = 'ipl'
         self.odi_collection = 'odi'
@@ -290,8 +293,11 @@ class GameTheory:
         """
         if instance == 'prod':
             logging.info('connecting to mongo Atlas')
-            self.db_client = MongoClient('mongodb+srv://gameuser:gameuser2020@gametheory-cricket-bc-4dki7.mongodb.net/'
-                                         'gametheory?retryWrites=true&w=majority')
+            self.db_client = MongoClient('mongodb+srv://{}:{}@{}/'
+                                         '{}?retryWrites=true&w=majority'.format(self.config['db']['username'],
+                                                                                 self.config['db']['password'],
+                                                                                 self.config['db']['atlas'],
+                                                                                 self.db_name))
         else:
             logging.info('connecting to local Atlas')
             self.db_client = MongoClient(host, port)
@@ -324,7 +330,7 @@ class GameTheory:
     def run(self):
         """main executor/controller"""
         # initial setup
-        self.connect_to_mongo(instance='prod')
+        self.connect_to_mongo(instance=self.config['db']['instance'])
         logging.info("Connection made")
         # get id's
         player_id_list = self.get_current_active_player_id()
