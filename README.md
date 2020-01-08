@@ -5,6 +5,7 @@
 - Uses BeautifulSoap python package and scraps all the **cricket statistics** 
 - Data sync to mongo DB
 - Includes active player stats for below,
+
 		- ipl
 		- t20
 		- odi
