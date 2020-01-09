@@ -7,3 +7,4 @@ test_scrap.py
 utiltest.py
 v2.py
 templates
+.dockerignore
