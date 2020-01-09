@@ -21,6 +21,13 @@ version v1.0.1:
     - Implemented CLOUD BASED Mongo DB server
     - Sync with cloud DB
 
+
+version v2.0.0:
+    - 2020/01/09
+    - Included docker file
+    - Updated mongo DB data structure
+    - Updated DB collections
+
 Note: Make sure nosql DB is configured, up and running
 
 Todo: v2 multiprocessing and multithreading
@@ -39,6 +46,7 @@ import configparser
 
 class GameTheory:
     """ class to control player stats web scraping"""
+
     def __init__(self):
         # logging
         logging.basicConfig(level=logging.INFO, filename='gametheory.log', filemode='w',
@@ -78,14 +86,15 @@ class GameTheory:
         Fetches the active player id from howstats.
         Note: id's are used to fetch player stats.
 
-        :return: (type list) list of active player id's
+        :return: (type list) list of active player id and name
         """
         logging.info('getting the current active player id\'s')
         current_active_player_html = "{}{}".format(self.base_url, "PlayerListCurrent.asp")
         current_active_player_info = requests.get(current_active_player_html)
         parser = BeautifulSoup(current_active_player_info.content, 'html.parser')
         active_player = parser.select('.TableLined tr')
-        player_id = []  # stores the player id's
+        player_id_array = []  # stores only the player id
+        player_id = []  # stores the player id's and respective name
         counter = 0  # count the active player
         logging.info('getting unique player')
         for unique_player in active_player:
@@ -94,11 +103,12 @@ class GameTheory:
             if player_info is not None:
                 unique_record[str(player_info['href']).strip().split("=")[1]] = player_info.text.strip().lower()
                 player_id.append(unique_record)
+                player_id_array.append(str(player_info['href']).strip().split("=")[1])
                 counter += 1
                 logging.info('{}. adding player record - {}'.format(counter, unique_record))
         # inserting into DB
         logging.info('updating the data set')
-        dataset = {'_id': 2019, 'param': player_id}  # prepare for the data set.
+        dataset = {'_id': 2020, 'param': player_id, 'player_id': player_id_array}  # prepare for the data set.
         self.db_sync(dataset=dataset, db_name=self.db_name, db_collection=self.player_id_collection,
                      db_operation=self.DB_UPDATE_ONE)
         logging.info('done: Total player count: {}'.format(counter))
@@ -125,8 +135,10 @@ class GameTheory:
         bio_profile = self.SERIES.copy()  # coping global object
         bio_profile['_id'] = player_id  # variable acts as a primary key in DB
         for unique_items in player_profile:
-            bio_profile['name'] = re.sub(r'[^\x00-\x7F]+', ' ',
-                                         str(unique_items.select_one('.TextGreenBold12').text).strip())
+            bio_profile_name = re.sub(r'[^\x00-\x7F]+', ' ',
+                                      str(unique_items.select_one('.TextGreenBold12').text).strip())
+            bio_profile['name'] = bio_profile_name.replace('-', ' ').lower()
+            bio_profile['country'] = (bio_profile_name.strip().split('(')[1]).split(')')[0].replace(' ', '').lower()
             for each_bio in unique_items.select('.FieldName'):
                 bio_profile[each_bio.text.strip().replace(':', '').replace(' ', '_').lower()] = 'null' \
                     if each_bio.find_next_sibling('td').text.strip() == '' \
@@ -138,7 +150,8 @@ class GameTheory:
         series_match = player_profile[1].select('.TextBlack10')
         for each_series in range(0, len(series_played)):
             series = series_played[each_series].text.strip().replace(' ', '_').lower()
-            temp_match_count = " ".join(re.sub(r'[^\x00-\x7F]+', ' ', str(series_match[each_series].text).strip()).split())
+            temp_match_count = " ".join(
+                re.sub(r'[^\x00-\x7F]+', ' ', str(series_match[each_series].text).strip()).split())
             match_count = int(re.findall(r'\d+', temp_match_count)[0])
             logging.info('&&&&&&&&&&&&&&&&&&&&&&')
             logging.info('{}/{}'.format(series, temp_match_count))
@@ -285,7 +298,7 @@ class GameTheory:
     def connect_to_mongo(self, host='127.0.0.1', port=27017, instance='local'):
         """
         Helps to connect to Mongo DB, default to host as local host and port to mongo default 17012.
-        
+
         :param host: host IP
         :param port: mongo port
         :param instance: DB env instance
@@ -338,11 +351,13 @@ class GameTheory:
         counter = 1
         for each_id in player_id_list:
             for k, _ in each_id.items():
-                logging.info("** {}/{} *************************************************".format(counter, len(player_id_list)))
+                logging.info(
+                    "** {}/{} *************************************************".format(counter, len(player_id_list)))
                 updated_bio = self.get_player_bio(k)
                 if updated_bio is not None:
                     self.diverge(updated_bio)
-                    logging.info("** {}/{} *********************************************/200".format(counter, len(player_id_list)))
+                    logging.info("** {}/{} *********************************************/200".format(counter, len(
+                        player_id_list)))
                     counter += 1
         logging.info('** end')
 
@@ -354,5 +369,3 @@ if __name__ == '__main__':
     end = time.time()
     logging.info("execution time : {} s".format(round(float(end - start), 2)))
     logging.info("----------------------------------------------------------")
-
-
